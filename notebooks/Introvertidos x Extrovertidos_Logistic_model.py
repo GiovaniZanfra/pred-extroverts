@@ -35,7 +35,11 @@ caminho_arquivo2 = path("Databases\\test.csv")
 df_test= pd.read_csv(caminho_arquivo2) 
 
 caminho_arquivo3 = path("Databases\\train.csv")
-df_train= pd.read_csv(caminho_arquivo3) 
+caminho_arquivo3_parquet = path("notebooks\\data_no_Outliers.parquet")
+#df_train= pd.read_csv(caminho_arquivo3) 
+df_train = pd.read_parquet(caminho_arquivo3_parquet)
+
+
 
 #%% drop Na columns
 
