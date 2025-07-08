@@ -1,0 +1,111 @@
+# 1. PATHS
+paths:
+  raw: "data/raw"                      # onde estão os CSVs originais
+  interim: "data/interim"              # saída do process.py
+  processed: "data/processed"          # saída do feature.py
+  cv_indices: "data/processed/cv_idx.pkl"
+
+data:
+  train: "data/processed/train.csv"
+  test: "data/processed/test.csv"
+  target_col: Personality
+  id_col: id
+
+# 2. PROCESSAMENTO BINÁRIO (process.py)
+process:
+  enable: true                         # ativa/desativa todo o script process.py
+  encode_binomial:
+    enable: true                       # aplica map 0/1
+    binomial_map:
+      "Yes": 1
+      "No": 0
+      "True": 1
+      "False": 0
+      Extrovert: 1
+      Introvert: 0
+
+
+# 3. FEATURE ENGINEERING (feature.py)
+feature_engineering:
+  enable: true                         # ativa/desativa feature.py (após process)
+  steps:
+    - flag_missing                     # adiciona is_null_* e any_missing
+    - add_composite_mean               # média dos scores sociais
+    - add_composite_pca                # PCA nos scores sociais
+    - numeric_combinations             # combos numéricas
+    - categorical_combinations         # combos categóricas
+
+  flag_missing:
+    enable: true
+
+  add_composite_mean:
+    enable: false
+    cols:
+      - Social_event_attendance
+      - Going_outside
+      - Friends_circle_size
+      - Post_frequency
+
+  add_composite_pca:
+    enable: false
+    cols:
+      - Social_event_attendance
+      - Going_outside
+      - Friends_circle_size
+      - Post_frequency
+    n_components: 1
+    scale_before: true
+
+  numeric_combinations:
+    enable: false
+    cols:
+      - Time_spent_Alone
+      - Social_event_attendance
+      - Going_outside
+      - Friends_circle_size
+      - Post_frequency
+    operations:
+      - product
+      - diff
+      # - ratio                       # descomente pra ativar
+    eps: 1e-8
+
+  categorical_combinations:
+    enable: false
+    cols:
+      - Stage_fear
+      - Drained_after_socializing
+    sep: "_AND_"
+
+# 4. CROSS-VALIDATION
+cv:
+  n_splits: 5
+  shuffle: True
+  random_state: 42
+
+pipeline_steps:
+  - name: imputation
+    params:
+      strategy: median
+  - name: standardscaler
+    params: {}
+
+estimator:
+  name: xgbclassifier   # or logistic_regression | xgbclassifier
+  params:
+    # # logistic defaults
+    # C: 1.0
+    # penalty: l2
+    # max_iter: 100
+    # or for xgbclassifier:
+    objective: "binary:logistic"
+    eval_metric: logloss
+    max_depth: 4
+    eta: 0.01
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+
+output:
+  oof: output/oof_preds.csv
+  test: output/test_preds.csv
