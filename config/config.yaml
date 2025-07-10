@@ -109,3 +109,5 @@ estimator:
 output:
   oof: output/oof_preds.csv
   test: output/test_preds.csv
+
+mlflow_experiment: "pred_introverts_extroverts"
