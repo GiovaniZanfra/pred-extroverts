@@ -4,21 +4,42 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
+from catboost import CatBoostClassifier
 
 # Evaluator and Logger
 from evaluator import Evaluator
 from logger import MLflowLogger
+from sklearn.ensemble import (
+    ExtraTreesClassifier,
+    GradientBoostingClassifier,
+    RandomForestClassifier,
+)
 
 # Transformers
 from sklearn.impute import SimpleImputer
 
 # Models
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import (
+    LogisticRegression,
+    LogisticRegressionCV,
+    PassiveAggressiveClassifier,
+    Perceptron,
+    RidgeClassifier,
+    SGDClassifier,
+    SGDOneClassSVM,
+)
 
 # CV and predictions
 from sklearn.model_selection import KFold, StratifiedKFold, cross_val_predict
+from sklearn.neighbors import (
+    KNeighborsClassifier,
+    NearestCentroid,
+    RadiusNeighborsClassifier,
+)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC, LinearSVC, NuSVC
+from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
 
 CONFIG_PATH = Path(__file__).parent.parent / "config" / "config.yaml"
@@ -49,10 +70,44 @@ def get_estimator(est_cfg):
     params = est_cfg.get('params', {})
     if name == 'logistic_regression':
         return LogisticRegression(**params)
+    elif name == 'logistic_regression_cv':
+        return LogisticRegressionCV(**params)
     elif name == 'xgbclassifier':
         return XGBClassifier(**params)
+    elif name == 'random_forest':
+        return RandomForestClassifier(**params)
+    elif name == 'gradient_boosting':
+        return GradientBoostingClassifier(**params)
+    elif name == 'linear_svc':
+        return LinearSVC(**params)
+    elif name == 'nusvc':
+        return NuSVC(**params)
+    elif name == 'svc':
+        return SVC(**params)
+    elif name == 'extra_tree':
+        return ExtraTreesClassifier(**params)
+    elif name == 'decision_tree':
+        return DecisionTreeClassifier(**params)
+    elif name == 'knn':
+        return KNeighborsClassifier(**params)
+    elif name == 'nearest_centroid':
+        return NearestCentroid(**params)
+    elif name == 'radius_neighbors':
+        return RadiusNeighborsClassifier(**params)
+    elif name == 'passive_aggressive':
+        return PassiveAggressiveClassifier(**params)
+    elif name == 'perceptron':
+        return Perceptron(**params)
+    elif name == 'ridge':
+        return RidgeClassifier(**params)
+    elif name == 'sgd':
+        return SGDClassifier(**params)
+    elif name == 'oneclass_svm':
+        return SGDOneClassSVM(**params)
+    elif name == 'catboost':
+        return CatBoostClassifier(**params)
     else:
-        raise ValueError(f"Unknown estimator: {name}")
+        raise ValueError(f"Unknown estimator: {name}")(f"Unknown estimator: {name}")
 
 
 def main():
@@ -109,7 +164,6 @@ def main():
     # Save CSVs and misclassified IDs list
     oof_df.to_csv(cfg['output']['oof'], index=False)
     test_df_out.to_csv(cfg['output']['test'], index=False)
-    # Save misclassified IDs to text file
     miscl_path = Path(cfg['output']['oof']).parent / 'misclassified_ids.txt'
     with open(miscl_path, 'w') as f:
         for iid in misclassified_ids:
@@ -117,13 +171,15 @@ def main():
 
     # Log to MLflow
     logger = MLflowLogger(exp_name=cfg.get('mlflow_experiment', 'default'))
+    # Log which estimator was used
+    logger.log_params({'estimator_name': cfg['estimator']['name']})
+    # Log estimator hyperparameters
     logger.log_params(cfg['estimator'].get('params', {}))
     logger.log_metric('oof_precision', precision)
     logger.log_artifact(cfg['output']['oof'], artifact_path='oof')
     logger.log_artifact(cfg['output']['test'], artifact_path='test')
-    # Log misclassified IDs list
     logger.log_artifact(str(miscl_path), artifact_path='errors')
-
+    logger.log_model(estimator)
     print(f"OOF predictions saved to {cfg['output']['oof']}")
     print(f"Test predictions saved to {cfg['output']['test']}")
     print(f"Misclassified IDs saved to {miscl_path}")

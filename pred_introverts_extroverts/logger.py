@@ -29,5 +29,8 @@ class MLflowLogger(BaseLogger):
     def log_artifact(self, filepath, artifact_path=None):
         mlflow.log_artifact(filepath, artifact_path)
 
+    def log_model(self, estimator):
+        mlflow.set_tag('model', estimator.__class__.__name__)
+
     def __del__(self):
         mlflow.end_run()
