@@ -19,6 +19,7 @@ from sklearn.metrics import confusion_matrix, accuracy_score,\
     
 from sklearn.metrics import roc_curve, auc
 import seaborn as sns
+from sklearn.metrics import roc_curve, auc
 
 #%% Import data
 
@@ -35,10 +36,10 @@ caminho_arquivo2 = path("Databases\\test.csv")
 df_test= pd.read_csv(caminho_arquivo2) 
 
 caminho_arquivo3 = path("Databases\\train.csv")
-caminho_arquivo3_parquet = path("notebooks\\data_no_Outliers.parquet")
-df_train= pd.read_csv(caminho_arquivo3) 
-#df_train = pd.read_parquet(caminho_arquivo3_parquet)
+caminho_arquivo3_parquet = path("Databases\\data_no_Outliers.parquet")
 
+#df_train= pd.read_csv(caminho_arquivo3) 
+df_train = pd.read_parquet(caminho_arquivo3_parquet)
 
 
 #%% drop Na columns
@@ -158,42 +159,82 @@ df_resultados = pd.DataFrame({
  
 #%% Construção de gráficos
 
-# Construção da curva ROC
-from sklearn.metrics import roc_curve, auc
+#%% plot ROC Curve
 
-# Função 'roc_curve' do pacote 'metrics' do sklearn
+def plot_ROC_curve(df,target,predict):
+    # Função 'roc_curve' do pacote 'metrics' do sklearn
 
-fpr, tpr, thresholds =roc_curve(df_x_train['Personality'], df_x_train['predict'])
-roc_auc = auc(fpr, tpr)
+    fpr, tpr, thresholds =roc_curve(df[target], df[predict])
+    roc_auc = auc(fpr, tpr)
 
-# Cálculo do coeficiente de GINI
-gini = (roc_auc - 0.5)/(0.5)
+    # Cálculo do coeficiente de GINI
+    gini = (roc_auc - 0.5)/(0.5)
 
-# Plotando a curva ROC
-plt.figure(figsize=(15,10))
-plt.plot(fpr, tpr, marker='o', color='darkorchid', markersize=10, linewidth=3)
-plt.plot(fpr, fpr, color='gray', linestyle='dashed')
-plt.title('Área abaixo da curva: %g' % round(roc_auc, 4) +
-          ' | Coeficiente de GINI: %g' % round(gini, 4), fontsize=22)
-plt.xlabel('1 - Especificidade', fontsize=20)
-plt.ylabel('Sensitividade', fontsize=20)
-plt.xticks(np.arange(0, 1.1, 0.2), fontsize=14)
-plt.yticks(np.arange(0, 1.1, 0.2), fontsize=14)
-plt.show()
+    # Plotando a curva ROC
+    plt.figure(figsize=(15,10))
+    plt.plot(fpr, tpr, marker='o', color='darkorchid', markersize=10, linewidth=3)
+    plt.plot(fpr, fpr, color='gray', linestyle='dashed')
+    plt.title('Área abaixo da curva: %g' % round(roc_auc, 4) +
+              ' | Coeficiente de GINI: %g' % round(gini, 4), fontsize=22)
+    plt.xlabel('1 - Especificidade', fontsize=20)
+    plt.ylabel('Sensitividade', fontsize=20)
+    plt.xticks(np.arange(0, 1.1, 0.2), fontsize=14)
+    plt.yticks(np.arange(0, 1.1, 0.2), fontsize=14)
+    plt.show()
+    
+
+def plot_Sigmoid(df,predict,logit):
+    
+    plt.figure(figsize=(15,10))
+    sns.regplot(x=df[logit], y=df_x_train[predict],
+                ci=None, marker='o', logistic=True,
+                scatter_kws={'color':'orange', 's':250, 'alpha':0.7},
+                line_kws={'color':'darkorchid', 'linewidth':7})
+    plt.axhline(y = 0.5, color = 'grey', linestyle = ':')
+    plt.xlabel('Logito (Z)', fontsize=20)
+    plt.ylabel('Probabilidade de evento (P)', fontsize=20)
+    plt.xticks(np.arange(df[logit].min() - 0.01 , df[logit].max() + 0.01),
+               fontsize=14)
+    plt.yticks(np.arange(0, 1.1, 0.2), fontsize=14)
+    plt.show
 
 
+def predict_data(df,list_to_drop,colunas_one_hot_encoding,model):
+    df_copy = df.copy()
+    df_copy = preencher_na__moda(df_copy)
+    id_df_copy = df_copy['id'] 
+    df_copy.drop(list_to_drop, axis=1, inplace=True)
+    df_copy_x = pd.get_dummies(df_copy, colunas_one_hot_encoding, dtype=int, drop_first=True)
+    df_copy_x['Probability'] = model.predict(df_copy_x) 
+    df_copy_x['Personality'] = model.predict(df_copy_x) 
+    df_copy_x['Personality'] = np.where(df_copy_x['Personality'] >= 0.5 , 'Extrovert','Introvert')
+    df_copy_x['id'] =  id_df_copy
+    return df_copy_x
+
+def preencher_na__moda(df):
+    for coluna in df.columns:
+        if df[coluna].isna().any():
+            moda = df[coluna].mode()
+            if not moda.empty:
+                df[coluna].fillna(moda[0], inplace=True)
+    return df
+
+
+
+
+#%% Execute graphs
 # Plotando Sigmoide em função do logíto
+plot_Sigmoid(df_x_train,'predict','Logit')
+plot_ROC_curve(df_x_train,'Personality','predict')
+predicted_data = predict_data(df_test,['id'],colunas_one_hot_encoding,model)
 
-plt.figure(figsize=(15,10))
-sns.regplot(x=df_x_train['Logit'], y=df_x_train['predict'],
-            ci=None, marker='o', logistic=True,
-            scatter_kws={'color':'orange', 's':250, 'alpha':0.7},
-            line_kws={'color':'darkorchid', 'linewidth':7})
-plt.axhline(y = 0.5, color = 'grey', linestyle = ':')
-plt.xlabel('Logito (Z)', fontsize=20)
-plt.ylabel('Probabilidade de evento (P)', fontsize=20)
-plt.xticks(np.arange(df_x_train['Logit'].min() - 0.01 , df_x_train['Logit'].max() + 0.01),
-           fontsize=14)
-plt.yticks(np.arange(0, 1.1, 0.2), fontsize=14)
-plt.show
+submission_df = predicted_data[['id', 'Personality']]  # Lista de colunas
+
+
+caminho_submission = path("Databases\\submission.csv")
+submission_df.to_csv(caminho_submission)
+
+
+
+
 
